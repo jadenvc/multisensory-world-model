@@ -7,6 +7,8 @@ from .va_robotwin_train_cfg import va_robotwin_train_cfg
 from .va_demo_train_cfg import va_demo_train_cfg
 from .va_demo_cfg import va_demo_cfg
 from .va_demo_i2va import va_demo_i2va_cfg
+from .va_umi_wbw_cfg import va_umi_wbw_cfg
+from .va_umi_wbw_train_cfg import va_umi_wbw_train_cfg
 
 VA_CONFIGS = {
     'robotwin': va_robotwin_cfg,
@@ -17,4 +19,6 @@ VA_CONFIGS = {
     'demo': va_demo_cfg,
     'demo_train': va_demo_train_cfg,
     'demo_i2av': va_demo_i2va_cfg,
+    'umi_wbw': va_umi_wbw_cfg,
+    'umi_wbw_train': va_umi_wbw_train_cfg,
 }

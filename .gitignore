@@ -1,0 +1,25 @@
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Training / experiment outputs
+wandb/
+checkpoints/
+train_out/
+reconstruction_out/
+action_compare_out/
+data/
+
+# Benchmark images / temporary plots
+*.png
+
+# Large/generated artifacts
+*.zarr/
+*.pt
+*.pth
+*.ckpt
+*.npz
+*.npy
+

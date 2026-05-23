@@ -85,6 +85,75 @@ class MultiLatentLeRobotDataset(torch.utils.data.Dataset):
     ):
         return sum(len(v) for v in self._datasets)
 
+    def get_episode_split_indices(
+        self,
+        validation_fraction=0.02,
+        validation_size=128,
+        validation_seed=42,
+        return_episode_info=False,
+    ):
+        episode_groups = []
+        for dset_id, dset in enumerate(self._datasets):
+            episodes = {}
+            base_idx = self.acc_dset_num[dset_id]
+            for local_idx, meta in enumerate(dset.new_metas):
+                episode_index = int(meta["episode_index"])
+                episodes.setdefault(episode_index, []).append(base_idx + local_idx)
+
+            for episode_index in sorted(episodes):
+                episode_groups.append((dset_id, episode_index, episodes[episode_index]))
+
+        if len(episode_groups) < 2:
+            raise ValueError(
+                "Episode-level validation requires at least two episodes with valid latents."
+            )
+
+        target_samples = min(
+            int(validation_size),
+            max(1, int(len(self) * float(validation_fraction))),
+        )
+        target_samples = min(target_samples, len(self) - 1)
+
+        generator = torch.Generator().manual_seed(int(validation_seed))
+        group_order = torch.randperm(len(episode_groups), generator=generator).tolist()
+
+        val_group_ids = []
+        val_count = 0
+        for group_id in group_order:
+            if len(episode_groups) - len(val_group_ids) <= 1:
+                break
+            val_group_ids.append(group_id)
+            val_count += len(episode_groups[group_id][2])
+            if val_count >= target_samples:
+                break
+
+        val_group_id_set = set(val_group_ids)
+        val_indices = []
+        train_indices = []
+        val_episode_info = []
+        for group_id, (_, _, indices) in enumerate(episode_groups):
+            if group_id in val_group_id_set:
+                val_indices.extend(indices)
+                dset_id, episode_index, episode_indices = episode_groups[group_id]
+                val_episode_info.append({
+                    "dataset_id": dset_id,
+                    "episode_index": episode_index,
+                    "num_samples": len(episode_indices),
+                    "first_sample_index": min(episode_indices),
+                    "last_sample_index": max(episode_indices),
+                })
+            else:
+                train_indices.extend(indices)
+
+        if len(train_indices) == 0 or len(val_indices) == 0:
+            raise ValueError(
+                "Episode-level validation split produced an empty train or validation set."
+            )
+
+        if return_episode_info:
+            return train_indices, val_indices, val_episode_info
+        return train_indices, val_indices
+
     def _get_item_id_to_dataset_id(self):
         item_id_to_dataset_id = {}
         acc_dset_num = {}
@@ -261,6 +330,9 @@ class LatentLeRobotDataset(LeRobotDataset):
             left_action = get_relative_pose(action[:, :7])
             right_action = get_relative_pose(action[:, 8:15])
             action = np.concatenate([left_action, action[:, 7:8], right_action, action[:, 15:16]], axis=1)
+        elif self.config.env_type == 'umi_single':
+            eef_action = get_relative_pose(action[:, :7])
+            action = np.concatenate([eef_action, action[:, 7:8]], axis=1)
         action = np.pad(action, pad_width=((frame_stride * 4, 0), (0, 0)), mode='constant', constant_values=0)
 
         latent_frame_num = (len(latent_frame_ids) - 1) // 4 + 1
